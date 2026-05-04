@@ -25,6 +25,19 @@ jobs:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
+      - name: Debug environment variables
+        uses: docker://alpine:3.18
+        shell: sh
+        run: |
+          echo "APP_NAME: ${{ env.APP_NAME }}"
+          echo "AWS_REGION: ${{ env.AWS_REGION }}"
+          echo "AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}"
+          echo "ECR_REPO: ${{ env.ECR_REPO }}"
+          echo "CLUSTER_NAME: ${{ env.CLUSTER_NAME }}"
+          echo "NAMESPACE: ${{ env.NAMESPACE }}"
+          echo ""
+          echo "Constructed role ARN: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/cloudbees-infra-mgmt"
+
       - name: Login to AWS
         uses: cloudbees-io/configure-aws-credentials@v1
         with:
@@ -40,28 +53,9 @@ jobs:
         uses: cloudbees-io/kaniko@v1
         with:
           context: .
-          destination: ${{ env.ECR_REPO }}:${{ cloudbees.version }}
+          destination: ${{ env.ECR_REPO }}:${{ cloudbees.version }},${{ env.ECR_REPO }}:latest
           build-args: |
-            PORT=8080
-
-      - name: Tag image as latest
-        uses: docker://alpine:3.18
-        shell: sh
-        run: |
-          apk add --no-cache aws-cli
-
-          # Login to ECR
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-            docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-
-          # Pull the versioned image
-          docker pull ${{ env.ECR_REPO }}:${{ cloudbees.version }}
-
-          # Tag as latest
-          docker tag ${{ env.ECR_REPO }}:${{ cloudbees.version }} ${{ env.ECR_REPO }}:latest
-
-          # Push latest tag
-          docker push ${{ env.ECR_REPO }}:latest
+            PORT={{PORT}}
 
       - name: Configure EKS credentials
         uses: cloudbees-io/configure-eks-credentials@v1
