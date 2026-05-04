@@ -14,7 +14,7 @@ permissions:
 env:
   APP_NAME: goo4
   AWS_REGION: us-east-1
-  AWS_ACCOUNT_ID: 189768267137
+  AWS_ACCOUNT_ID: "189768267137"
   ECR_REPO: 189768267137.dkr.ecr.us-east-1.amazonaws.com/goo4-image
   CLUSTER_NAME: hive-vibe
   NAMESPACE: goo4
@@ -41,8 +41,8 @@ jobs:
       - name: Login to AWS
         uses: cloudbees-io/configure-aws-credentials@v1
         with:
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::189768267137:role/cloudbees-infra-mgmt
+          aws-region: ${{AWS_REGION}}
+          role-to-assume: arn:aws:iam::{{AWS_ACCOUNT_ID}}:role/cloudbees-infra-mgmt
           role-duration-seconds: "3600"
 
       - name: Configure ECR credentials
