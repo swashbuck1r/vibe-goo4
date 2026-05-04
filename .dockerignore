@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+goo4
+*.exe
+
+# Documentation
+README.md
+*.md
+
+# CI/CD (not needed in image)
+.cloudbees/
+Makefile
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+*_test.go

@@ -1,0 +1,110 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Deploy goo4
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  scm-token-own: read
+  id-token: write
+
+env:
+  APP_NAME: goo4
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: 189768267137
+  ECR_REPO: 189768267137.dkr.ecr.us-east-1.amazonaws.com/goo4-image
+  CLUSTER_NAME: hive-vibe
+  NAMESPACE: goo4
+
+jobs:
+  build-and-deploy:
+    steps:
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+
+      - name: Login to AWS
+        uses: cloudbees-io/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/cloudbees-infra-mgmt
+          role-duration-seconds: "3600"
+
+      - name: Configure ECR credentials
+        uses: cloudbees-io/configure-ecr-credentials@v1
+
+      - name: Build and push Docker image
+        id: build-image
+        uses: cloudbees-io/kaniko@v1
+        with:
+          context: .
+          destination: ${{ env.ECR_REPO }}:${{ cloudbees.version }}
+          build-args: |
+            PORT=8080
+
+      - name: Tag image as latest
+        uses: docker://alpine:3.18
+        shell: sh
+        run: |
+          apk add --no-cache aws-cli
+
+          # Login to ECR
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+          # Pull the versioned image
+          docker pull ${{ env.ECR_REPO }}:${{ cloudbees.version }}
+
+          # Tag as latest
+          docker tag ${{ env.ECR_REPO }}:${{ cloudbees.version }} ${{ env.ECR_REPO }}:latest
+
+          # Push latest tag
+          docker push ${{ env.ECR_REPO }}:latest
+
+      - name: Configure EKS credentials
+        uses: cloudbees-io/configure-eks-credentials@v1
+        with:
+          name: ${{ env.CLUSTER_NAME }}
+
+      - name: Configure ECR credentials for Helm
+        uses: cloudbees-io/configure-ecr-credentials@v1
+
+      - name: Deploy to Kubernetes
+        uses: cloudbees-io/helm-install@v1
+        with:
+          chart-location: oci://${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.APP_NAME }}
+          version: "0.1.0"
+          release-name: ${{ env.APP_NAME }}
+          namespace: ${{ env.NAMESPACE }}
+          values: |
+            image:
+              tag: ${{ cloudbees.version }}
+
+      - name: Verify deployment
+        uses: docker://alpine:3.18
+        shell: sh
+        run: |
+          apk add --no-cache curl
+
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+
+          echo "Waiting for deployment to be ready..."
+          kubectl rollout status deployment/${{ env.APP_NAME }} -n ${{ env.NAMESPACE }} --timeout=5m
+
+          echo ""
+          echo "Deployment status:"
+          kubectl get pods,svc,ingress -n ${{ env.NAMESPACE }}
+
+          echo ""
+          echo "================================================"
+          echo "✅ Deployment Complete!"
+          echo "================================================"
+          echo "App: ${{ env.APP_NAME }}"
+          echo "Version: ${{ cloudbees.version }}"
+          echo "URL: https://${{ env.APP_NAME }}.arch.beescloud.com"
+          echo "================================================"
