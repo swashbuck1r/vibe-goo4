@@ -28,8 +28,8 @@ jobs:
       - name: Login to AWS
         uses: cloudbees-io/configure-aws-credentials@v1
         with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/cloudbees-infra-mgmt
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::189768267137:role/cloudbees-infra-mgmt
           role-duration-seconds: "3600"
 
       - name: Configure ECR credentials
