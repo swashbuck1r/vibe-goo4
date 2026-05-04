@@ -41,7 +41,7 @@ jobs:
       - name: Login to AWS
         uses: cloudbees-io/configure-aws-credentials@v1
         with:
-          aws-region: ${{AWS_REGION}}
+          aws-region: ${{env.AWS_REGION}}
           role-to-assume: arn:aws:iam::{{AWS_ACCOUNT_ID}}:role/cloudbees-infra-mgmt
           role-duration-seconds: "3600"
 
